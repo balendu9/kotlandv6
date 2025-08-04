@@ -18,7 +18,7 @@ contract QuestContract {
         token = IERC20(_token);
     }
 
-    function fetchTileInfo(uint256 regionId, uint8 tileId)
+    function fetchTileInfo(uint256 regionId, uint32 tileId)
     internal view returns (
         uint32 id,
         bool isBeingUsed,
@@ -43,12 +43,13 @@ contract QuestContract {
     }
 
     uint256 public cropPrice = 50000 * 10 ** 18;
-    function plantCrop(uint256 regionId, uint256 tileId, uint8 cropTypeId) external {
+    function plantCrop(uint256 regionId, uint8 tileId, uint8 cropTypeId) external {
         (, bool isBeingUsed, , , , , , ) = fetchTileInfo(regionId, tileId);
         require(!isBeingUsed && cropTypeId <=5, "INVALID_ACTION");
         require(token.transferFrom(msg.sender, admin, cropPrice), "TOKEN_TRANSFER_FAILED");
         tilecontract.setCropOrFactory(true, tileId, cropTypeId, msg.sender, regionId);
         recordAction(msg.sender, 1);
+        userContract.updateUserExp(msg.sender, 7);
     }
 
     uint256 public factoryPrice = 500000 * 10 ** 18;
@@ -58,6 +59,7 @@ contract QuestContract {
         require(token.transferFrom(msg.sender, admin, factoryPrice), "TOKEN_TRANSFER_FAILED");
         tilecontract.setCropOrFactory(false, tileId, _factoryTypeId, msg.sender, regionId);      
         recordAction(msg.sender, 2);
+        userContract.updateUserExp(msg.sender, 13);
     }
 
     mapping(uint256 => mapping(uint32 => uint256)) public lastWateredTime;
@@ -66,33 +68,37 @@ contract QuestContract {
         require(isBeingUsed && isCrop && block.timestamp > lastWateredTime[regionId][tileId] + 1 days, "ONCE_IN_24_HOURS");
         lastWateredTime[regionId][tileId] = block.timestamp;
         
-        (uint8 pollution, uint8 fertilityR, , uint8 eco, ) = fetchRegionInfo(regionId);
+        (uint8 pollution, , , uint8 eco, ) = fetchRegionInfo(regionId);
 
         uint8 growth = computecontract.plantGrowthCalculator(
             cropTypeId, fertility, waterLevel, eco,  pollution, true, msg.sender
         );
         // uint8 _cropType, uint8 _fertility, uint8 _waterlevel, uint8 _ecoscore, uint8 _pollutionlevel, bool worf, address _user
         tilecontract.updateWFG(tileId, true, growth, regionId, msg.sender);
+
+        userContract.updateUserExp(msg.sender, 2);
     }
 // updateWFG(uint32 tileId, bool worf, uint8 growth, uint256 regionId, address _user)
 
     function fertilizeCrop(uint256 regionId, uint32 tileId) external {
         (, bool isBeingUsed, bool isCrop , uint8 cropTypeId, , uint8 fertility, uint8 waterLevel, ) = fetchTileInfo(regionId, tileId);
         require(isBeingUsed && isCrop && fertility <= 100, "INVALID");
-        (uint8 pollution, uint8 fertilityR, uint8 waterlevel, uint8 eco, ) = fetchRegionInfo(regionId);
+        (uint8 pollution, uint8 fertilityR, , uint8 eco, ) = fetchRegionInfo(regionId);
 
         uint8 growth = computecontract.plantGrowthCalculator(
             cropTypeId, fertilityR, waterLevel, eco,  pollution, true, msg.sender
         );
         tilecontract.updateWFG(tileId, false, growth, regionId, msg.sender);
+        userContract.updateUserExp(msg.sender, 4);
     }
 
     function harvestCrop(uint256 regionId, uint32 tileId) external {
-        (, bool isBeingUsed, bool isCrop , uint8 cropTypeId, , uint8 fertility, , uint8 growthStage) = fetchTileInfo(regionId, tileId);
+        (, bool isBeingUsed, bool isCrop , uint8 cropTypeId, , , , uint8 growthStage) = fetchTileInfo(regionId, tileId);
         require(isBeingUsed && isCrop && growthStage == 100, "INVALID");
         tilecontract.updateAfterHarvest(tileId, regionId, msg.sender);
         computecontract.getHarvestedResourceAndAmount(cropTypeId, msg.sender);
         recordAction(msg.sender, 3);
+        userContract.updateUserExp(msg.sender, 15);
     }
 
     function produceFromFactory(uint256 regionId, uint32 tileId, uint8 _factoryTypeId) external {
@@ -100,6 +106,8 @@ contract QuestContract {
         require(isBeingUsed && !isCrop && _factoryTypeId == factoryTypeId, "INVALID");
         computecontract._produceFromFactory(msg.sender, factoryTypeId);
         recordAction(msg.sender, 4);
+
+        userContract.updateUserExp(msg.sender, 8);
     }
 
 
@@ -149,20 +157,6 @@ contract QuestContract {
     mapping(address => DailyProgress) public progress;
     mapping(address => LongProgress) public longprogress;
 
-     
-        // quests[1].name ="Crop Planter";
-        // quests[1].id = 1;
-        // quests[1].amountToComplete = 1; //crops to plant
-        // quests[1].reward = 500 * 10 ** 18; // 500 kot tokens
-        // quests[1].assetType = 0; // reward type: token
-
-        // quests[2].name = "Factory Builder";
-        // quests[2].id = 2;
-        // quests[2].amountToComplete = 3; //factories to build
-        // quests[2].reward = 100;// 1000 kot tokens
-        // quests[2].assetType = 1;  // inventory asset you want to give as reward
-
-    
 
     function createQuest(
         string memory _name,
@@ -173,7 +167,7 @@ contract QuestContract {
         uint8 _assetType,
         uint256 _maxParticipants,
         uint256 _endDay
-    ) external onlyAdmin {
+    ) external {
         uint256 questId = nextQuestId;
         Quest storage q = quests[questId];
 
@@ -186,7 +180,7 @@ contract QuestContract {
         q.assetType = _assetType;
         q.maxParticipants = _maxParticipants;
         
-        q.endDay = today + getCurrentDay();
+        q.endDay =  getCurrentDay() + _endDay;
         nextQuestId++;
     }
 
@@ -250,8 +244,9 @@ contract QuestContract {
         
         uint256 userProgress;
         uint256 reward;
-        uint256 assettype;
-        if (dp.daily) {
+
+        uint8 assettype;
+        if (q.daily) {
             if(q.actionToDo == 1){
                 userProgress = dp.cropsPlanted;
             } else if (q.actionToDo == 2) {
@@ -269,7 +264,7 @@ contract QuestContract {
             assettype = q.assetType;
 
 
-            dp.currDay = currentDay;
+            dp.currDay = today;
             dp.cropsPlanted = 0;
             dp.factoriesBuilt = 0;
             dp.cropsHarvested = 0;
@@ -300,11 +295,14 @@ contract QuestContract {
 
         }
 
-        if (assetType == 0) {
+        if (assettype == 0) {
             require(token.transfer(msg.sender, reward), "TOKEN_TRANSFER_FAILED");
         } else {
-            userContract.updateInventory(msg.sender, assettype, reward, true);
+            userContract.updateInventory(msg.sender, assettype, uint8(reward), true);
         }  
+
+
+        userContract.updateUserExp(msg.sender, 31);
         
     }
 

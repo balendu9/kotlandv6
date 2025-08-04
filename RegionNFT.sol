@@ -9,7 +9,7 @@ import "@openzeppelin/contracts/utils/Base64.sol";
 
 contract RegionNFT is ERC721Enumerable {
     using Counters for Counters.Counter;
-    using String for uint256;
+    using Strings for uint256;
 
     address public admin;
     address public treasury;
@@ -26,7 +26,8 @@ contract RegionNFT is ERC721Enumerable {
     uint256 public constant PRICE_ETH = 0.02 ether;
 
     string public baseImageURL;
-    constructor(address _token, address _treasury, address _quest, string calldata _baseurl) {
+
+    constructor(address _token, address _treasury, address _quest, string memory _baseurl) ERC721 ("Region", "KREGION") {
         admin = msg.sender;
         token = IERC20(_token);
         treasury = _treasury;

@@ -181,10 +181,59 @@ contract Users {
         }
     }
 
+    
     function updateUserExp(address _user, uint32 exp) external internalContracts {
         users[_user].userExp += exp;
     }
 
-
     
+    // referrals
+
+    mapping(address => address) public referredBy; //mapping from user => their reffer
+    mapping(address => address[]) public referrals; //mapping from reffer => list of referrals
+    mapping(address => bool) public hasSetReferrer;
+
+    struct referreraddtime {
+        address referree;
+        uint256 timestamp;
+    } 
+    mapping(address => referreraddtime[]) public referraladdTimeHistory;
+
+    function setReferrer(address _referrer) external {
+        require(!hasSetReferrer[msg.sender], "REFERRER_ALREADY_SET");
+        require(_referrer != address(0), "INVALID_REFERRER");
+        require(_referrer != msg.sender, "CANNOT_REFERRER_YOURSELF");
+
+        referredBy[msg.sender] = _referrer;
+        referrals[_referrer].push(msg.sender);
+        hasSetReferrer[msg.sender] = true;
+        referraladdTimeHistory[_referrer].push(
+            referreraddtime({
+                referree: msg.sender,
+                timestamp: block.timestamp
+            })
+        );
+    }
+
+    function getReferralCount(address _referrer) external view returns (uint256) {
+        return referrals[_referrer].length;
+    }
+
+    struct ReferralEarning{
+        address referee;
+        uint256 amount;
+        uint256 timestamp;
+    } 
+    mapping(address => ReferralEarning[]) public referralrewardhistory;
+    mapping(address => uint256) public totalReferralEarnings;
+
+    function updateReferralEarning(address _user, uint256 _amount) external internalContracts {
+        totalReferralEarnings[_user] += _amount;
+        
+    } 
+
+    function getReferrer(address user) external view returns (address) {
+        return referredBy[user];
+    }
+
 }

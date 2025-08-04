@@ -15,6 +15,9 @@ contract Compute {
         _;
     }
 
+    
+
+
     uint8 public currentSeason = 0;
 
     function plantGrowthCalculator (
