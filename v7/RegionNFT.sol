@@ -136,36 +136,49 @@ contract RegionNFT is ERC721Enumerable, ReentrancyGuard {
         return string.concat("data:application/json;base64,", Base64.encode(bytes(json)));
     }
 
+    // function _applyChange(uint8 current, int16 change, uint16 divisor) internal pure returns (uint8) {
+    //     int16 inc = int16((( int16(100) - int16(current)) * change) / int16(divisor)) + 1;
+    //     int16 temp = int16(current) + inc;
+
+    //     if (temp < 0) return 0;
+    //     if (temp > 100) return 100;
+    //     return uint8(temp);
+    // }
+
     function _applyChange(uint8 current, int16 change, uint16 divisor) internal pure returns (uint8) {
-        int16 inc = int16((( int16(100) - int16(current)) * change) / int16(divisor)) + 1;
-        int16 temp = int16(current) + inc;
+        int256 curr = int256(uint256(current));
+        int256 inc = (((int256(100) - curr) * int256(change)) / int256(uint256(divisor))) + 1;
+        int256 temp = curr + inc;
 
         if (temp < 0) return 0;
         if (temp > 100) return 100;
-        return uint8(temp);
+        return uint8(uint256(temp));
     }
 
+
     function _updateRegionMeta(
-        uint256 regionId,
-        int16 fertChange,
-        int16 waterChange,
-        int16 pollChange,
-        int16 divisor
-    ) internal {
-        RegionMeta storage m = regionMeta[regionId];
-        
-        m.fertility = _applyChange(m.fertility, fertChange, divisor);
-        m.waterlevel = _applyChange(m.waterlevel, waterChange, divisor);
-        m.pollution = _applyChange(m.pollution, pollChange, divisor);
+    uint256 regionId,
+    int16 fertChange,
+    int16 waterChange,
+    int16 pollChange,
+    uint16 divisor
+) internal {
+    RegionMeta storage m = regionMeta[regionId];
+    
+    m.fertility = _applyChange(m.fertility, fertChange, divisor);
+    m.waterlevel = _applyChange(m.waterlevel, waterChange, divisor);
+    m.pollution = _applyChange(m.pollution, pollChange, divisor);
 
-        uint16 ecoVal = uint16(100 - m.pollution) + uint16(m.fertility) + uint16(m.waterlevel);
-        m.eco = ecoVal > 100 ? 100 : uint8(ecoVal);
+    uint16 ecoVal = uint16(100 - m.pollution) + uint16(m.fertility) + uint16(m.waterlevel);
+    m.eco = ecoVal > 100 ? 100 : uint8(ecoVal);
 
-        m.lastupdate = block.timestamp;
+    m.lastupdate = block.timestamp;
+}
+
         // new formula
         // inc = floor((100 - curr) * change / D) + 1
         // new = min(100, curr + inc)
-    }
+    
 
 
 

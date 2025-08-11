@@ -17,18 +17,25 @@ contract QuestContract is ReentrancyGuard {
     Compute public computecontract;
     IERC20 public token;
 
-    constructor(
+    constructor() {
+        admin = msg.sender;
+         
+    }
+
+    function setContracts(
         address _userContract,
         address _tilecontractaddress,
         address _computecontract,
         address _token
-    ) {
-        admin = msg.sender;
+    ) external {
+        require(msg.sender == admin, "NOT_AUTHORIZED");
+     
         userContract = Users(_userContract);
         tilecontract = RegionNFT(_tilecontractaddress);
         computecontract = Compute(_computecontract);
         token = IERC20(_token);
     }
+
     
     event QuestCreated(uint256 indexed questId, string name, bool daily, uint8 actionToDo, uint256 reward);
     event QuestJoined(uint256 indexed questId, address indexed participant);
@@ -43,7 +50,7 @@ contract QuestContract is ReentrancyGuard {
 
     function fetchTileInfo(
         uint256 regionId,
-        uint32 tileId
+        uint8 tileId
     )
         internal
         view
@@ -86,7 +93,7 @@ contract QuestContract is ReentrancyGuard {
     ) external nonReentrant {
         (, bool isBeingUsed, , , , , , ) = fetchTileInfo(regionId, tileId);
         require(!isBeingUsed && cropTypeId <= 5, "INVALID_ACTION");
-        token.safeTransferFrom(msg.sender, owner(), cropPrice);
+        token.safeTransferFrom(msg.sender, admin, cropPrice);
 
         tilecontract.setCropOrFactory(
             true,
@@ -109,7 +116,7 @@ contract QuestContract is ReentrancyGuard {
     ) external nonReentrant {
         (, bool isBeingUsed, , , , , , ) = fetchTileInfo(regionId, tileId);
         require(!isBeingUsed && _factoryTypeId <= 5, "INVALID");
-        token.safeTransferFrom(msg.sender, owner3(), factoryPrice);
+        token.safeTransferFrom(msg.sender, admin, factoryPrice);
 
         tilecontract.setCropOrFactory(
             false,
@@ -127,7 +134,7 @@ contract QuestContract is ReentrancyGuard {
 
     mapping(uint256 => mapping(uint32 => uint256)) public lastWateredTime;
 
-    function waterCrop(uint256 regionId, uint32 tileId) external {
+    function waterCrop(uint256 regionId, uint8 tileId) external {
         (
             ,
             bool isBeingUsed,
@@ -166,7 +173,7 @@ contract QuestContract is ReentrancyGuard {
 
     // updateWFG(uint32 tileId, bool worf, uint8 growth, uint256 regionId, address _user)
 
-    function fertilizeCrop(uint256 regionId, uint32 tileId) external {
+    function fertilizeCrop(uint256 regionId, uint8 tileId) external {
         (
             ,
             bool isBeingUsed,
@@ -196,7 +203,7 @@ contract QuestContract is ReentrancyGuard {
         emit CropFertilized(msg.sender, regionId, tileId);
     }
 
-    function harvestCrop(uint256 regionId, uint32 tileId) external {
+    function harvestCrop(uint256 regionId, uint8 tileId) external {
         (
             ,
             bool isBeingUsed,
@@ -218,7 +225,7 @@ contract QuestContract is ReentrancyGuard {
 
     function produceFromFactory(
         uint256 regionId,
-        uint32 tileId,
+        uint8 tileId,
         uint8 _factoryTypeId
     ) external {
         (
